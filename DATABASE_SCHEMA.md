@@ -11,7 +11,7 @@
 | Timestamp convention | `TIMESTAMP WITH TIME ZONE` on every temporal column — all times stored in UTC, converted at the presentation layer |
 | Constraint enforcement | Business-critical enums (`role`, `status`, `dispatch_mode`) enforced via `CHECK` constraints at the database level, not application-only |
 
-> **Note on source of truth:** This document reflects the field names in the locked-in physical schema diagram (`reflex-system-db-schema_drawio.svg`), which splits the requested `full_name` field on `users` into `first_name` / `last_name`, and corrects a `confimed_at` → `confirmed_at` typo present in the diagram. Flag this to the team if `full_name` was intended as a single column.
+> **Note on source of truth:** This document reflects the field names in the locked-in physical schema diagram (`reflex-system-db-schema_drawio.png`), which splits the requested `full_name` field on `users` into `first_name` / `last_name`, and corrects a `confimed_at` → `confirmed_at` typo present in the diagram. Flag this to the team if `full_name` was intended as a single column.
 
 ## 2. Table-by-Table Schema Dictionary
 
