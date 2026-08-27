@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#10231f" />
+  <title>Reflex | Delivery operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand"><span class="brand-mark">R</span><span>reflex</span></div>
+      <div class="workspace-switcher"><span class="workspace-icon"><i data-lucide="store"></i></span><span><b>Kilimani Hub</b><small>Retail operations</small></span><i data-lucide="chevrons-up-down"></i></div>
+      <nav class="nav-list">
+        <p class="nav-label">Workspace</p>
+        <button class="nav-item active" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></button>
+        <button class="nav-item" data-view="orders"><i data-lucide="package-search"></i><span>All deliveries</span><span class="nav-count">12</span></button>
+        <button class="nav-item" data-view="new-order"><i data-lucide="plus-circle"></i><span>New request</span></button>
+        <p class="nav-label secondary-label">Manage</p>
+        <button class="nav-item" data-view="dispatch"><i data-lucide="shuffle"></i><span>Dispatcher queue</span><span class="nav-count">3</span></button>
+        <button class="nav-item" data-view="rider-actions"><i data-lucide="scan-line"></i><span>Rider actions</span></button>
+        <button class="nav-item" data-view="riders"><i data-lucide="bike"></i><span>Rider team</span></button>
+        <button class="nav-item" data-view="activity"><i data-lucide="history"></i><span>Activity log</span></button>
+      </nav>
+      <div class="sidebar-footer"><div class="sync-status"><span class="pulse-dot"></span><span><b>System synced</b><small>Updated just now</small></span></div><button class="help-button"><i data-lucide="circle-help"></i><span>Help centre</span></button></div>
+    </aside>
+    <button class="drawer-backdrop" aria-label="Close navigation"></button>
+
+    <main class="main-content">
+      <header class="topbar"><button class="mobile-menu" aria-label="Open navigation"><i data-lucide="menu"></i></button><div class="breadcrumbs"><span>Workspace</span><i data-lucide="chevron-right"></i><b id="breadcrumb-title">Overview</b></div><div class="topbar-actions"><button class="icon-button notification-button" aria-label="Notifications"><i data-lucide="bell"></i><span></span></button><div class="profile"><span class="avatar">AM</span><span class="profile-text"><b>Amara M.</b><small>Retailer staff</small></span><i data-lucide="chevron-down"></i></div></div></header>
+
+      <div class="page-container">
+        <section class="page-heading"><div><p class="eyebrow">Thursday, 27 August 2026</p><h1 id="page-title">Good morning, Amara <span>↗</span></h1><p class="subheading">Here’s what’s moving across your delivery network today.</p></div><button class="primary-button" data-view="new-order"><i data-lucide="plus"></i> New delivery request</button></section>
+
+        <div id="app-view"></div>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status"><i data-lucide="check-circle-2"></i><span>Changes saved</span></div>
+  <script src="app.js"></script>
+</body>
+</html>
