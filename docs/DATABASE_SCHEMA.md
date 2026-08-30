@@ -13,6 +13,8 @@
 
 > **Note on source of truth:** This document reflects the field names in the locked-in physical schema diagram (`reflex-system-db-schema_drawio.png`), which splits the requested `full_name` field on `users` into `first_name` / `last_name`, and corrects a `confimed_at` → `confirmed_at` typo present in the diagram. Flag this to the team if `full_name` was intended as a single column.
 
+> **Note on dispatch automation:** The 10-minute auto-assignment fallback described in earlier drafts of this schema has been **deferred to a later phase** — the team's current deadline doesn't allow time to build and test the background worker safely. No schema change was needed to defer it: `orders.dispatch_mode` still includes `'auto_timeout'` as a valid value, purely to avoid a future migration if/when that feature is picked back up. For the current build, every order will be assigned with `dispatch_mode = 'manual'`. See `SYSTEM_ARCHITECTURE.md` Section 5 for the full rationale.
+
 ## 2. Table-by-Table Schema Dictionary
 
 ### 2.1 `users`
@@ -119,7 +121,7 @@ Extends a `users` row (where `role = 'rider'`) with delivery-specific operationa
 | `updated_at` | `TIMESTAMP WITH TIME ZONE` | `NOT NULL` | `CURRENT_TIMESTAMP` |
 
 **Indexing:**
-- `idx_riders_status` on `(status)` — **critical path index.** Both the human dispatcher UI and the automated fallback worker query `WHERE status = 'available'` on every assignment decision; this index is what keeps that query fast as the rider pool grows.
+- `idx_riders_status` on `(status)` — **critical path index.** The human dispatcher UI queries `WHERE status = 'available'` on every assignment decision; this index is what keeps that query fast as the rider pool grows. (Also positions the table for the deferred automated fallback worker, should Phase 2 pick it up — see note above.)
 - `idx_riders_user_id` — implicit via the FK/unique relationship if enforced 1:1 (see ERD spec); otherwise a plain index on `(user_id)`.
 
 ```sql
@@ -152,13 +154,13 @@ The central transactional table. Tracks a single delivery request from creation 
 | `item_description` | `TEXT` | `NOT NULL` | — |
 | `delivery_address` | `TEXT` | `NOT NULL` | — |
 | `status` | `VARCHAR(30)` | `CHECK (status IN ('Logged','Assigned','Picked Up','En Route','Delivered'))` | `'Logged'` |
-| `dispatch_mode` | `VARCHAR(20)` | `CHECK (dispatch_mode IN ('manual','auto_timeout','pending'))` | `'pending'` |
+| `dispatch_mode` | `VARCHAR(20)` | `CHECK (dispatch_mode IN ('manual','auto_timeout','pending'))` — `auto_timeout` reserved for a deferred Phase 2 feature; current builds only write `manual` | `'pending'` |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | `NOT NULL` | `CURRENT_TIMESTAMP` |
 | `assigned_at` | `TIMESTAMP WITH TIME ZONE` | nullable | `NULL` |
 | `confirmed_at` | `TIMESTAMP WITH TIME ZONE` | nullable | `NULL` |
 
 **Indexing:**
-- `idx_orders_status_created` on `(status, created_at)` — **the index the 10-minute fallback worker depends on.** Its poll query (`WHERE status = 'Logged' AND created_at < NOW() - INTERVAL '10 minutes'`) is a direct beneficiary of this composite index.
+- `idx_orders_status_created` on `(status, created_at)` — supports the open-order queue view (`WHERE status = 'Logged' ORDER BY created_at`) that human dispatchers work from. Also reserved for the deferred auto-assignment fallback's poll query, should that feature be built in a later phase.
 - `idx_orders_shop_id` on `(shop_id)` — recommended, supports "orders for this shop" retailer-facing queries.
 - `idx_orders_assigned_rider_id` on `(assigned_rider_id)` — recommended, supports a rider's "my active jobs" query.
 
@@ -189,7 +191,7 @@ CREATE INDEX idx_orders_assigned_rider_id ON orders (assigned_rider_id);
 
 ### 2.6 `order_logs`
 
-Append-only audit trail. Every status transition on an order — whether triggered by a human or the system — is written here.
+Append-only audit trail. Every status transition on an order is written here, including who or what triggered it (currently always a human dispatcher or retailer/rider action; a system-triggered entry is reserved for the deferred auto-assignment feature).
 
 | Column | Type | Constraints | Default |
 |---|---|---|---|
@@ -220,8 +222,8 @@ CREATE INDEX idx_order_logs_order_id ON order_logs (order_id);
 
 | Index | Table | Columns | Purpose |
 |---|---|---|---|
-| `idx_orders_status_created` | `orders` | `status, created_at` | Powers the 10-minute auto-assignment fallback poll query |
-| `idx_riders_status` | `riders` | `status` | Powers rider-availability lookups for both manual and automated dispatch |
+| `idx_orders_status_created` | `orders` | `status, created_at` | Powers the dispatcher's open-order queue view; reserved for the deferred auto-assignment poll query |
+| `idx_riders_status` | `riders` | `status` | Powers rider-availability lookups for manual dispatch (and any future automated dispatch) |
 | `idx_orders_shop_id` | `orders` | `shop_id` | Retailer order history views |
 | `idx_orders_assigned_rider_id` | `orders` | `assigned_rider_id` | Rider "my jobs" views |
 | `idx_shops_retailer_id` | `shops` | `retailer_id` | Retailer shop listing |
@@ -229,4 +231,4 @@ CREATE INDEX idx_order_logs_order_id ON order_logs (order_id);
 | `idx_order_logs_order_id` | `order_logs` | `order_id` | Order audit-trail retrieval |
 | `idx_users_role` | `users` | `role` | Filtering dispatcher/rider pools |
 
-The two indexes explicitly required by the architecture (`idx_orders_status_created`, `idx_riders_status`) sit on the system's two hottest queries — the fallback worker's poll and every dispatch decision's availability check — and should be treated as non-negotiable for production performance.
+The two indexes explicitly called out in the architecture (`idx_orders_status_created`, `idx_riders_status`) sit on the system's two hottest queries for the current MVP — the dispatcher's open-order queue and every manual assignment decision's availability check — and should be treated as non-negotiable for production performance, independent of whether the automated fallback is ever built.

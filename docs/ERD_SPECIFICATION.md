@@ -24,10 +24,12 @@ This document specifies the cardinality and referential-integrity rules of the R
 | `shops` → `orders` | **1-to-Many** | One shop can have many orders logged against it. Each order belongs to exactly one shop. |
 | `customers` → `orders` | **1-to-Many** | One customer can place many orders over time (the mechanism enabling repeat-order tracking). Each order references exactly one customer. |
 | `riders` → `orders` | **1-to-Many** | One rider can be assigned many orders (across time — not concurrently, in practice, though the schema does not itself enforce single-active-order). An order has at most one assigned rider at a time (`assigned_rider_id` is nullable until assignment). |
-| `users` → `orders` (as assigner) | **1-to-Many** | One dispatcher user can be the human assigner of many orders. An order has at most one human assigner — `assigned_by_user_id` is `NULL` when the assignment was made by the automated fallback worker rather than a person. |
+| `users` → `orders` (as assigner) | **1-to-Many** | One dispatcher user can be the human assigner of many orders. An order has at most one human assigner — `assigned_by_user_id` is `NULL` when no human has assigned it yet, or (in a future phase) when assignment was made by an automated fallback worker rather than a person. |
 | `orders` → `order_logs` | **1-to-Many** | One order accumulates many log entries over its lifecycle (one per status transition, starting from creation). Each log entry belongs to exactly one order. |
 
 **On the dispatcher relationship specifically:** `orders` does not have a single "dispatcher" foreign key. Instead, the dispatch actor is represented by *two* fields working together — `assigned_by_user_id` (who, if a human) and `dispatch_mode` (how — `manual` vs `auto_timeout`). This avoids forcing a synthetic "system user" row into `users` purely to represent non-human actors.
+
+> **Current scope note:** The automated fallback dispatch agent (and its `dispatch_mode = 'auto_timeout'` path) has been deferred to a later phase — the team's timeline doesn't allow for building and testing it now. For the current build, every order assignment is human-made (`dispatch_mode = 'manual'`), and `assigned_by_user_id` will always be populated once an order reaches `Assigned`. The schema fields for the automated path remain in place so no migration is needed if that feature is picked up later. See `SYSTEM_ARCHITECTURE.md` Section 5 for full rationale.
 
 ## 4. Foreign Key Action Rules
 
