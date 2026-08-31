@@ -6,7 +6,7 @@ Reflex is a logistics coordination platform purpose-built for small Kenyan retai
 
 Reflex replaces that patchwork with a single system of record: retailer staff log a delivery once, a dispatcher assigns it to a rider, and every status change — from `Logged` through `Delivered` — is captured as a structured, queryable event. The result is a delivery workflow that is auditable and measurable, with dispatch handled by a human dispatcher for the initial release. The schema and dispatch-mode field are designed so that automated fallback assignment can be added in a later phase without a schema change (see Section 5).
 
-The system is built on PostgreSQL 14+ for transactional integrity and FastAPI for a fast, typed, async API layer — a combination chosen specifically to support the time-sensitive, state-machine-driven nature of delivery tracking.
+The system is built on SQLite for its embedded, zero-ops data store and FastAPI for a fast, typed, async API layer — a combination chosen for its simplicity and speed to ship, given the current deadline (see Section 4 for the trade-offs this implies).
 
 ## 2. Architecture Overview (Text Diagram)
 
@@ -38,7 +38,7 @@ The system is built on PostgreSQL 14+ for transactional integrity and FastAPI fo
    │
    ▼
 ┌───────────────────────────────────────────────────────────────────────────┐
-│                          PostgreSQL 14+ (Primary Store)                    │
+│                       SQLite Database File (Primary Store)                 │
 │                                                                             │
 │   users · shops · customers · riders · orders · order_logs                 │
 │                                                                             │
@@ -77,9 +77,20 @@ Customers are **not** system users — they have no login and no `users` row. Th
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Database | PostgreSQL 14+ | Strong relational integrity for a workflow that is fundamentally a state machine (order status transitions) with strict foreign-key relationships between shops, customers, riders, and orders. `CHECK` constraints enforce valid status/role/dispatch-mode values at the data layer, not just in application code. `TIMESTAMP WITH TIME ZONE` throughout keeps delivery-time logic unambiguous across time zones, and leaves room for time-based dispatch logic in a later phase. |
-| API | FastAPI | Async-first, which keeps the door open for background/scheduled work (e.g., a future auto-assignment worker) to be added alongside request/response traffic without a framework change. Native request/response validation via typed models reduces the risk of malformed order or status data reaching Postgres. Auto-generated OpenAPI docs speed up integration for the retailer web client and rider mobile client. |
+| Database | SQLite | Embedded, file-based database with zero separate server to install, configure, or operate — a meaningful win against the current deadline, since there's no connection pool, hosting, or ops overhead to stand up before the team can start writing queries. Fully supports the relational integrity the schema depends on: foreign keys with `CASCADE` / `RESTRICT` / `SET NULL` actions, and `CHECK` constraints enforcing valid `role` / `status` / `dispatch_mode` values at the data layer. Ships with Python's standard library, so FastAPI can talk to it with no extra driver install. |
+| API | FastAPI | Async-first, which keeps the door open for background/scheduled work (e.g., a future auto-assignment worker) to be added alongside request/response traffic without a framework change. Native request/response validation via typed models reduces the risk of malformed order or status data reaching the database. Auto-generated OpenAPI docs speed up integration for the retailer web client and rider mobile client. |
 | Background Processing | Not in current scope | A scheduled worker for automated dispatch fallback (e.g., APScheduler or system cron) is not part of the initial build. It is a planned Phase 2 addition — see Section 5. |
+
+### 4.1 Trade-offs of Choosing SQLite
+
+This choice comes with real constraints the team should go in aware of, not discover mid-build:
+
+- **Single-writer concurrency.** SQLite locks the whole database file for writes — only one write transaction can be in flight at a time (reads can still proceed concurrently under WAL mode, see `DATABASE_SCHEMA.md` Section 3). For Reflex's current write volume — retailer staff logging orders, a dispatcher assigning them, riders updating status — this is very unlikely to be a bottleneck at small-retailer scale, but it is a ceiling that Postgres wouldn't have.
+- **No network access by default.** The database is a single file on one machine's disk. This is fine for a single-server deployment, but means the API server and the database can't trivially live on separate machines, and there's no built-in replication story if the team later needs a standby or read replica.
+- **Weaker type enforcement.** SQLite uses type *affinity* rather than strict column types — a `VARCHAR(100)` column will not actually reject a 500-character string at the database level the way Postgres does. `CHECK` constraints still work fully, so the enum-style fields (`role`, `status`, `dispatch_mode`) remain protected; free-text field lengths need to be validated in the FastAPI/Pydantic layer instead.
+- **No native timezone-aware timestamp type.** Handled by convention — see `DATABASE_SCHEMA.md` Section 1 — but it does mean the application layer, not the database, is responsible for keeping every timestamp in UTC.
+
+**Migration path:** none of this rules out moving to PostgreSQL later if Reflex needs to scale past what a single SQLite file comfortably handles (concurrent multi-retailer write load, multi-server deployment, etc.). The schema was designed against Postgres originally and translates back cleanly — foreign key structure, `CHECK` constraints, and index strategy all carry over unchanged; only the primary-key syntax (`SERIAL` vs `INTEGER PRIMARY KEY AUTOINCREMENT`) and timestamp column type would need to change back.
 
 ## 5. Dispatch Logic: Manual Assignment (MVP) and the Deferred Auto-Assignment Fallback
 
@@ -105,7 +116,8 @@ This is a scope decision, not a schema decision: `orders.dispatch_mode` already 
 
 **Trigger condition (future):**
 ```sql
-CURRENT_TIMESTAMP - orders.created_at > INTERVAL '10 minutes'
+-- SQLite date arithmetic (no native INTERVAL type)
+julianday('now') - julianday(orders.created_at) > (10.0 / 1440.0)
 AND orders.status = 'Logged'
 ```
 
