@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 import models
@@ -10,6 +11,13 @@ from database import engine, get_db
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Reflex API", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Valid forward-only status transitions. This is the 'state locking' /
 # 'what happens when two things happen at once' answer: an order can
@@ -19,7 +27,8 @@ app = FastAPI(title="Reflex API", version="0.1.0")
 VALID_TRANSITIONS = {
     models.OrderStatus.LOGGED: {models.OrderStatus.ASSIGNED},
     models.OrderStatus.ASSIGNED: {models.OrderStatus.PICKED_UP},
-    models.OrderStatus.PICKED_UP: {models.OrderStatus.DELIVERED},
+    models.OrderStatus.PICKED_UP: {models.OrderStatus.EN_ROUTE},
+    models.OrderStatus.EN_ROUTE: {models.OrderStatus.DELIVERED},
     models.OrderStatus.DELIVERED: set(),
 }
 
