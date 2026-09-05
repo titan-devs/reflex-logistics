@@ -45,6 +45,8 @@ This document specifies the cardinality and referential-integrity rules of the R
 
 **Design pattern summary:** the schema uses `CASCADE` for strictly dependent/ownership relationships (a shop cannot outlive its retailer, a log cannot outlive its order), `RESTRICT` for the one relationship where data-loss prevention matters more than convenience (customer history), and `SET NULL` for relationships that are attributional rather than ownership-based (who was assigned, who did the assigning) — so that historical order data survives even if the referenced person or rider record is later removed.
 
+> **SQLite enforcement note:** all seven `ON DELETE` rules above are defined in the schema DDL, but SQLite does **not** enforce foreign keys unless `PRAGMA foreign_keys = ON;` has been run on the active connection — it is off by default. Every table-level rule in this section is inert until that pragma is set. See `DATABASE_SCHEMA.md` Section 3 for where this is wired into the connection setup.
+
 ## 5. Guide to the Visual Diagram
 
 The exported diagram (`reflex-system-db-schema_drawio.png`) is the canonical visual reference for this schema and should be treated as authoritative over prose descriptions where the two differ. Notably:
