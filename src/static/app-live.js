@@ -62,8 +62,10 @@ const requireSession = async () => {
     }, {once: true});
   });
 };
-const orderId = order => `RX-${String(1000 + order.order_id).padStart(4, '0')}`;
-const normalizeOrder = order => ({...order, id: orderId(order), customer: order.customer_name || 'Customer', rider: order.rider_name || 'Unassigned', item: order.item_description, address: order.delivery_address});
+const displayStatus = {logged: 'Logged', assigned: 'Assigned', picked_up: 'Picked Up', en_route: 'En Route', delivered: 'Delivered'};
+const apiStatus = {'Picked Up': 'picked_up', 'En Route': 'en_route', Delivered: 'delivered'};
+const orderId = order => `RX-${String(1000 + (order.order_id ?? order.id)).padStart(4, '0')}`;
+const normalizeOrder = order => ({...order, order_id: order.order_id ?? order.id, id: orderId(order), customer: order.customer_name || 'Customer', rider: order.rider_name || order.rider_id || 'Unassigned', item: order.item_description, address: order.delivery_address || order.address, status: displayStatus[order.status] || order.status});
 const statusClass = status => status === 'Delivered' ? 'status-delivered' : status === 'Logged' ? 'status-logged' : status === 'Assigned' ? 'status-assigned' : 'status-progress';
 const loadData = async () => {
   const [loadedOrders, loadedRiders, loadedActivity] = await Promise.all([api('/orders'), api('/riders'), api('/activity')]);
@@ -130,7 +132,7 @@ document.addEventListener('click', async event => {
   const statusButton = event.target.closest('[data-status-order]');
   if (statusButton) {
     const order = orders.find(item => item.order_id === Number(statusButton.dataset.statusOrder));
-    try { await api(`/orders/${order.order_id}/status`, {method: 'PATCH', body: JSON.stringify({status: nextStatus[order.status]})}); await refresh(true); showToast('Job status saved'); } catch (error) { showToast(error.message); }
+    try { await api(`/orders/${order.order_id}/status`, {method: 'PATCH', body: JSON.stringify({status: apiStatus[nextStatus[order.status]]})}); await refresh(true); showToast('Job status saved'); } catch (error) { showToast(error.message); }
   }
   const toggle = event.target.closest('.rider-toggle');
   if (toggle) {
@@ -140,7 +142,7 @@ document.addEventListener('click', async event => {
 document.addEventListener('submit', async event => {
   event.preventDefault();
   if (event.target.id === 'new-order-form') {
-    try { await api('/orders', {method: 'POST', body: JSON.stringify({customer_name: document.querySelector('#customer-name').value, customer_phone: document.querySelector('#customer-phone').value, delivery_address: document.querySelector('#delivery-address').value, item_description: document.querySelector('#item-description').value})}); await refresh(false); currentView = 'dispatch'; render(); showToast('Request saved to the database'); } catch (error) { showToast(error.message); }
+    try { await api('/orders', {method: 'POST', body: JSON.stringify({customer_name: document.querySelector('#customer-name').value, customer_phone: document.querySelector('#customer-phone').value, address: document.querySelector('#delivery-address').value, item_description: document.querySelector('#item-description').value})}); await refresh(false); currentView = 'dispatch'; render(); showToast('Request saved to the database'); } catch (error) { showToast(error.message); }
   }
   if (event.target.id === 'new-rider-form') {
     try { await api('/riders', {method: 'POST', body: JSON.stringify({first_name: document.querySelector('#rider-first-name').value, last_name: document.querySelector('#rider-last-name').value, phone_number: document.querySelector('#rider-phone').value, vehicle_type: document.querySelector('#rider-vehicle').value || null})}); await refresh(false); render(); showToast('Rider saved to the database'); } catch (error) { showToast(error.message); }

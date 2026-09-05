@@ -10,16 +10,27 @@ class Base(DeclarativeBase):
     pass
 
 
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    phone_number = Column(String(50), unique=True, nullable=False)
+    role = Column(String(20), nullable=False, default="retailer")
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class OrderStatus(str, Enum):
     LOGGED = "logged"
     ASSIGNED = "assigned"
     PICKED_UP = "picked_up"
     EN_ROUTE = "en_route"
     DELIVERED = "delivered"
-
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class Order(Base):
@@ -75,3 +86,15 @@ class StatusLog(Base):
     )
 
     order = relationship("Order", back_populates="status_logs")
+
+
+class Rider(Base):
+    __tablename__ = "riders"
+
+    rider_id = Column(Integer, primary_key=True, autoincrement=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    phone_number = Column(String(30), unique=True, nullable=False)
+    vehicle_type = Column(String(50), nullable=True)
+    status = Column(String(20), nullable=False, default="available")
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)

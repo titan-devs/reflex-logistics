@@ -13,7 +13,8 @@ class OrderCreate(BaseModel):
 
 
 class AssignRequest(BaseModel):
-    rider_id: str = Field(min_length=1, max_length=50)
+    rider_id: str | None = Field(default=None, min_length=1, max_length=50)
+    assigned_rider_id: int | None = None
 
 
 class StatusUpdate(BaseModel):
@@ -45,6 +46,41 @@ class OrderOut(BaseModel):
     status: OrderStatus
     rider_id: str | None
     created_at: datetime
+
+
+class RiderCreate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    phone_number: str = Field(min_length=1, max_length=30)
+    vehicle_type: str | None = Field(default=None, max_length=50)
+    status: str = Field(default="available", pattern="^(available|offline)$")
+
+
+class RiderStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(available|offline)$")
+
+
+class RiderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    rider_id: int
+    name: str
+    initials: str
+    vehicle_type: str | None
+    status: str
+    jobs_today: int = 0
+
+
+class SessionStart(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class SessionOut(BaseModel):
+    user_id: int
+    first_name: str
+    last_name: str
+    display_name: str
+    initials: str
 
 
 class OrderDetailOut(OrderOut):

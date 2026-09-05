@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Optional
+from uuid import uuid4
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,8 +9,9 @@ from sqlalchemy.orm import Session
 
 import models
 import schemas
-from database import engine, get_db
+from database import engine, get_db, migrate_legacy_orders
 
+migrate_legacy_orders()
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Reflex API", version="0.1.0")
@@ -39,6 +41,52 @@ def _log_status(db: Session, order: models.Order, status: models.OrderStatus,
                  changed_by: Optional[str]):
     order.status = status
     db.add(models.StatusLog(order_id=order.id, status=status, changed_by=changed_by))
+
+
+def _rider_out(db: Session, rider: models.Rider):
+    name = f"{rider.first_name} {rider.last_name}".strip()
+    jobs = db.query(models.Order).filter(
+        models.Order.rider_id == str(rider.rider_id),
+        models.Order.status != models.OrderStatus.DELIVERED,
+    ).count()
+    return schemas.RiderOut(
+        rider_id=rider.rider_id,
+        name=name,
+        initials="".join(part[0] for part in name.split()).upper(),
+        vehicle_type=rider.vehicle_type,
+        status=rider.status,
+        jobs_today=jobs,
+    )
+
+
+@app.post("/session", response_model=schemas.SessionOut)
+def start_session(payload: schemas.SessionStart, db: Session = Depends(get_db)):
+    parts = payload.name.strip().split()
+    first_name = parts[0]
+    last_name = " ".join(parts[1:]) or "Operator"
+    user = db.query(models.User).filter(
+        models.User.first_name == first_name,
+        models.User.last_name == last_name,
+        models.User.role == "retailer",
+    ).first()
+    if not user:
+        user = models.User(
+            first_name=first_name,
+            last_name=last_name,
+            phone_number=f"session-{uuid4().hex}",
+            role="retailer",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    display_name = f"{user.first_name} {user.last_name}"
+    return schemas.SessionOut(
+        user_id=user.user_id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        display_name=display_name,
+        initials="".join(part[0] for part in display_name.split()).upper(),
+    )
 
 
 # ---------------------------------------------------------------------
@@ -99,7 +147,14 @@ def assign_rider(order_id: int, payload: schemas.AssignRequest, db: Session = De
             status_code=409,
             detail=f"Order is '{order.status.value}', can only assign from 'logged'",
         )
-    order.rider_id = payload.rider_id
+    rider_id = payload.assigned_rider_id or payload.rider_id
+    if rider_id is None:
+        raise HTTPException(status_code=422, detail="A rider is required")
+    rider = db.query(models.Rider).filter(models.Rider.rider_id == int(rider_id)).first()
+    if not rider or rider.status != "available":
+        raise HTTPException(status_code=409, detail="Rider is not available")
+    order.rider_id = str(rider.rider_id)
+    rider.status = "on_delivery"
     _log_status(db, order, models.OrderStatus.ASSIGNED, changed_by="dispatcher")
     db.commit()
     db.refresh(order)
@@ -177,6 +232,62 @@ def sync_payload(payload: schemas.SyncPayload, db: Session = Depends(get_db)):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/riders", response_model=List[schemas.RiderOut])
+def list_riders(db: Session = Depends(get_db)):
+    return [_rider_out(db, rider) for rider in db.query(models.Rider).order_by(models.Rider.first_name).all()]
+
+
+@app.post("/riders", response_model=schemas.RiderOut, status_code=201)
+def create_rider(payload: schemas.RiderCreate, db: Session = Depends(get_db)):
+    if db.query(models.Rider).filter(models.Rider.phone_number == payload.phone_number).first():
+        raise HTTPException(status_code=409, detail="A rider with this phone number already exists")
+    rider = models.Rider(
+        first_name=payload.first_name.strip(),
+        last_name=payload.last_name.strip(),
+        phone_number=payload.phone_number.strip(),
+        vehicle_type=payload.vehicle_type,
+        status=payload.status,
+    )
+    db.add(rider)
+    db.commit()
+    db.refresh(rider)
+    return _rider_out(db, rider)
+
+
+@app.patch("/riders/{rider_id}/status", response_model=schemas.RiderOut)
+def update_rider_status(rider_id: int, payload: schemas.RiderStatusUpdate, db: Session = Depends(get_db)):
+    rider = db.query(models.Rider).get(rider_id)
+    if not rider:
+        raise HTTPException(status_code=404, detail="Rider not found")
+    if payload.status == "offline" and db.query(models.Order).filter(
+        models.Order.rider_id == str(rider_id),
+        models.Order.status.in_([
+            models.OrderStatus.ASSIGNED,
+            models.OrderStatus.PICKED_UP,
+            models.OrderStatus.EN_ROUTE,
+        ]),
+    ).count():
+        raise HTTPException(status_code=409, detail="Rider has an active delivery")
+    rider.status = payload.status
+    db.commit()
+    db.refresh(rider)
+    return _rider_out(db, rider)
+
+
+@app.get("/activity")
+def activity(db: Session = Depends(get_db)):
+    return [
+        {
+            "log_id": log.id,
+            "order_id": log.order_id,
+            "new_status": log.status.value,
+            "triggered_by": log.changed_by or "system",
+            "timestamp": log.created_at.isoformat(),
+        }
+        for log in db.query(models.StatusLog).order_by(models.StatusLog.created_at.desc()).limit(50).all()
+    ]
 
 
 frontend_dir = Path(__file__).resolve().parent / "static"
