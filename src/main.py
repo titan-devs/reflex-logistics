@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 import models
@@ -177,7 +179,7 @@ def health():
     return {"status": "ok"}
 
 
-frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+frontend_dir = Path(__file__).resolve().parent / "static"
 
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
