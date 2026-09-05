@@ -15,4 +15,4 @@ Open `index.html` directly in a browser. The prototype is dependency-free and do
 - Rider team and audit activity views
 - Responsive mobile navigation and layouts
 
-The current data is local demo state in `app.js`. The event handlers are intentionally grouped around the API actions the backend will provide: create order, assign rider, confirm payload, and update status.
+The dashboard is served by `src/static/app-live.js` and reads orders, riders, assignments, status transitions, and activity from the FastAPI API backed by SQLite. On each new browser session, the operator enters their name; that operator is stored in the `users` table and attached to assignment audit records. There is no local demo state in the served application.

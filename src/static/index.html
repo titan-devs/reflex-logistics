@@ -32,7 +32,7 @@
     <button class="drawer-backdrop" aria-label="Close navigation"></button>
 
     <main class="main-content">
-      <header class="topbar"><button class="mobile-menu" aria-label="Open navigation"><i data-lucide="menu"></i></button><div class="breadcrumbs"><span>Workspace</span><i data-lucide="chevron-right"></i><b id="breadcrumb-title">Overview</b></div><div class="topbar-actions"><button class="icon-button notification-button" aria-label="Notifications"><i data-lucide="bell"></i><span></span></button><div class="profile"><span class="avatar">AM</span><span class="profile-text"><b>Amara M.</b><small>Retailer staff</small></span><i data-lucide="chevron-down"></i></div></div></header>
+      <header class="topbar"><button class="mobile-menu" aria-label="Open navigation"><i data-lucide="menu"></i></button><div class="breadcrumbs"><span>Workspace</span><i data-lucide="chevron-right"></i><b id="breadcrumb-title">Overview</b></div><div class="topbar-actions"><button class="icon-button notification-button" aria-label="Notifications"><i data-lucide="bell"></i><span></span></button><div class="profile"><span class="avatar" id="profile-initials">OP</span><span class="profile-text"><b id="profile-name">Operator</b><small>Retailer staff</small></span><i data-lucide="chevron-down"></i></div></div></header>
 
       <div class="page-container">
         <section class="page-heading"><div><p class="eyebrow">Thursday, 27 August 2026</p><h1 id="page-title">Good morning, Amara <span>↗</span></h1><p class="subheading">Here’s what’s moving across your delivery network today.</p></div><button class="primary-button" data-view="new-order"><i data-lucide="plus"></i> New delivery request</button></section>
@@ -41,7 +41,8 @@
       </div>
     </main>
   </div>
+  <div id="session-gate" class="session-gate" aria-hidden="true"><form id="session-form" class="session-card"><span class="brand-mark">R</span><p class="eyebrow">Reflex workspace</p><h2>Who is signing in?</h2><p>Enter your name to open the workspace. Your identity will be saved for audit history.</p><label for="session-name">Your name</label><input id="session-name" required autocomplete="name" placeholder="e.g. Amara M." /><button class="primary-button" type="submit">Open workspace <i data-lucide="arrow-right"></i></button></form></div>
   <div id="toast" class="toast" role="status"><i data-lucide="check-circle-2"></i><span>Changes saved</span></div>
-  <script src="app.js"></script>
+  <script src="app-live.js"></script>
 </body>
 </html>
