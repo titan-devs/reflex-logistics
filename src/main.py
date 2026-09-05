@@ -175,12 +175,9 @@ def sync_payload(payload: schemas.SyncPayload, db: Session = Depends(get_db)):
 @app.get("/health")
 def health():
     return {"status": "ok"}
-<<<<<<< HEAD
 
 
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
-=======
->>>>>>> d54828691dc5b035f654ac4f5c219a0eb5ca8260
