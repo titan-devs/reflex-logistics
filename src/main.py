@@ -395,4 +395,7 @@ def health():
     return {"status": "ok"}
 
 
-app.mount("/", StaticFiles(directory=Path(__file__).resolve().parent / "static", html=True), name="static")
+frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
