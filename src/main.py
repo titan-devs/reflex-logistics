@@ -3,9 +3,8 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-import models
-import schemas
-from database import engine, get_db
+from . import models, schemas
+from .database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -86,7 +85,7 @@ def assign_rider(order_id: int, payload: schemas.AssignRequest, db: Session = De
     if order.status != models.OrderStatus.LOGGED:
         raise HTTPException(
             status_code=409,
-            detail=f"Order is '{order.status.value}', can only assign from 'logged'",
+            detail=f"Order is '{order.status}', can only assign from 'logged'",
         )
     order.rider_id = payload.rider_id
     _log_status(db, order, models.OrderStatus.ASSIGNED, changed_by="dispatcher")
